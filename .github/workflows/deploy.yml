@@ -401,7 +401,11 @@ jobs:
   deploy_epreprod:
     name: Deploy ePreProd
     needs: [route, build, qa_gate]
-    if: needs.route.outputs.use_epreprod == 'true'
+    if: >-
+      always() &&
+      needs.route.outputs.use_epreprod == 'true' &&
+      needs.build.result == 'success' &&
+      needs.qa_gate.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: epreprod
@@ -423,7 +427,10 @@ jobs:
   preprod_integration:
     name: ePreProd Integration Tests
     needs: [route, deploy_epreprod]
-    if: needs.route.outputs.use_epreprod == 'true'
+    if: >-
+      always() &&
+      needs.route.outputs.use_epreprod == 'true' &&
+      needs.deploy_epreprod.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -442,7 +449,10 @@ jobs:
   preprod_regression:
     name: ePreProd Regression Tests
     needs: [route, deploy_epreprod]
-    if: needs.route.outputs.use_epreprod == 'true'
+    if: >-
+      always() &&
+      needs.route.outputs.use_epreprod == 'true' &&
+      needs.deploy_epreprod.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -461,7 +471,10 @@ jobs:
   preprod_smoke:
     name: ePreProd Smoke Tests
     needs: [route, deploy_epreprod]
-    if: needs.route.outputs.use_epreprod == 'true'
+    if: >-
+      always() &&
+      needs.route.outputs.use_epreprod == 'true' &&
+      needs.deploy_epreprod.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -478,7 +491,10 @@ jobs:
   preprod_dast:
     name: ePreProd DAST Policy Validation
     needs: [route, deploy_epreprod]
-    if: needs.route.outputs.use_epreprod == 'true'
+    if: >-
+      always() &&
+      needs.route.outputs.use_epreprod == 'true' &&
+      needs.deploy_epreprod.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
