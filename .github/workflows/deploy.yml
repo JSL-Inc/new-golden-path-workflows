@@ -291,6 +291,7 @@ jobs:
     name: Smoke Tests
     needs: [route, deploy]
     if: >-
+      always() &&
       needs.route.outputs.smoke == 'true' &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
@@ -332,6 +333,7 @@ jobs:
     name: DAST Policy Validation
     needs: [route, deploy]
     if: >-
+      always() &&
       needs.route.outputs.dast == 'true' &&
       needs.deploy.result == 'success'
     runs-on: ubuntu-latest
