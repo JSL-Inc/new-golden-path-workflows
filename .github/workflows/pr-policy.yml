@@ -1,0 +1,78 @@
+name: PR Policy
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  branch-name:
+    name: Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate source branch name
+        shell: bash
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if [[ "$BRANCH" =~ ^develop-[A-Za-z0-9._-]+$ ||
+                "$BRANCH" =~ ^feature-eint[1-6]-f[0-9]+$ ||
+                "$BRANCH" =~ ^(release|hotfix)-(eqa|epreprod)-[A-Za-z0-9._-]+$ ]]; then
+            echo "Valid branch name: $BRANCH"
+          else
+            echo "::error::Unsupported branch name: $BRANCH"
+            exit 1
+          fi
+
+  branch-flow:
+    name: Branch Flow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate source and target branches
+        shell: bash
+        env:
+          SOURCE: ${{ github.head_ref }}
+          TARGET: ${{ github.base_ref }}
+        run: |
+          case "$SOURCE:$TARGET" in
+            develop-*:feature-eint[1-6]-f[0-9]* | \
+            feature-eint[1-6]-f[0-9]*:release-eqa-* | \
+            feature-eint[1-6]-f[0-9]*:release-epreprod-* | \
+            release-eqa-*:main | release-epreprod-*:main | \
+            hotfix-eqa-*:main | hotfix-epreprod-*:main)
+              echo "Allowed promotion: $SOURCE -> $TARGET"
+              ;;
+            *)
+              echo "::error::Unsupported promotion: $SOURCE -> $TARGET"
+              exit 1
+              ;;
+          esac
+
+  release-label:
+    name: Release Label
+    if: >-
+      github.base_ref == 'main' ||
+      github.base_ref == 'new-deploy-stuff' ||
+      github.base_ref == 'new-deploy-stuff-and-epreprod'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require exactly one SemVer label
+        shell: bash
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ' ') }}
+        run: |
+          count=0
+          for label in major minor patch; do
+            if [[ " $LABELS " == *" $label "* ]]; then
+              count=$((count + 1))
+            fi
+          done
+
+          if [[ "$count" -ne 1 ]]; then
+            echo "::error::Add exactly one release label: major, minor, or patch."
+            exit 1
+          fi
+
+          echo "Exactly one SemVer label is present."
