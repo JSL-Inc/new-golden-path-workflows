@@ -2,6 +2,8 @@ name: CI
 
 on:
   workflow_call:
+  pull_request:
+  merge_group:
 
 permissions:
   contents: read
@@ -9,6 +11,7 @@ permissions:
 jobs:
   quality:
     name: Build, Test, and Coverage
+    if: github.repository != 'JSL-Inc/new-golden-path-workflows'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,4 +51,3 @@ jobs:
           name: application-package
           path: dist/**
           if-no-files-found: error
-
