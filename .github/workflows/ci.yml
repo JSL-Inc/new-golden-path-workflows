@@ -41,3 +41,11 @@ jobs:
             reports/junit/results.xml
             reports/coverage/cobertura.xml
           if-no-files-found: error
+
+      - name: Upload application artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-package
+          path: dist/**
+          if-no-files-found: error
+
