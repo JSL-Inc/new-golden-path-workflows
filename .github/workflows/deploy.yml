@@ -100,45 +100,7 @@ jobs:
     name: Build and Quality Checks
     needs: route
     if: needs.route.outputs.branch_type != 'main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
-
-      - name: Build
-        run: bash scripts/build.sh
-
-      - name: Unit tests and code coverage
-        run: bash scripts/unit-test.sh
-
-      - name: Code quality
-        run: |
-          ruff check testing
-          ruff format --check testing
-
-      - name: Upload unit-test and coverage evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-evidence
-          path: |
-            reports/junit/results.xml
-            reports/coverage/cobertura.xml
-          if-no-files-found: error
-
-      - name: Upload application artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: application-package
-          path: dist/**
-          if-no-files-found: error
+    uses: JSL-Inc/new-golden-path-workflows/.github/workflows/ci.yml@condense-testing-branch
 
   promote_release_artifact:
     name: Promote Release Artifact
@@ -570,3 +532,4 @@ jobs:
           else
             echo "Release Readiness passed: EQA is complete; ePreProd is not used."
           fi
+
