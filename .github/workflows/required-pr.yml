@@ -1,0 +1,121 @@
+name: Golden Path Required PR
+
+on:
+  workflow_call:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: required-pr-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-policy:
+    name: Branch Policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate source and target branches
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref }}
+          TARGET_BRANCH: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+
+          echo "Validating promotion: ${SOURCE_BRANCH} -> ${TARGET_BRANCH}"
+
+          case "${SOURCE_BRANCH}:${TARGET_BRANCH}" in
+            develop-s[0-9]*:feature-eint[1-6]-f[0-9]*)
+              ;;
+            feature-eint[1-6]-f[0-9]*:release-eqa-* | \
+            feature-eint[1-6]-f[0-9]*:release-epreprod-*)
+              ;;
+            release-eqa-*:main | release-epreprod-*:main)
+              ;;
+            hotfix-eqa-*:main | hotfix-epreprod-*:main)
+              ;;
+            *)
+              echo "::error::Unsupported promotion: ${SOURCE_BRANCH} -> ${TARGET_BRANCH}"
+              echo "Allowed paths:"
+              echo "  develop-s### -> feature-eint[1-6]-f###"
+              echo "  feature-eint[1-6]-f### -> release-eqa-* or release-epreprod-*"
+              echo "  release-eqa-* or release-epreprod-* -> main"
+              echo "  hotfix-eqa-* or hotfix-epreprod-* -> main"
+              exit 1
+              ;;
+          esac
+
+          echo "Branch promotion is allowed."
+
+  pr-quality:
+    name: Build, Unit Test, and Coverage
+    needs: branch-policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out proposed result
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify golden-path scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f scripts/build.sh
+          test -f scripts/unit-test.sh
+
+      - name: Build
+        run: bash scripts/build.sh
+
+      - name: Unit tests and code coverage
+        run: bash scripts/unit-test.sh
+
+      - name: Verify standard reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s reports/junit/results.xml
+          test -s reports/coverage/cobertura.xml
+
+      - name: Upload test and coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: required-pr-evidence
+          path: |
+            reports/junit/results.xml
+            reports/coverage/cobertura.xml
+          if-no-files-found: warn
+
+  required-pr:
+    name: Golden Path Required PR
+    if: always()
+    needs:
+      - branch-policy
+      - pr-quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Evaluate required checks
+        shell: bash
+        env:
+          BRANCH_POLICY_RESULT: ${{ needs.branch-policy.result }}
+          PR_QUALITY_RESULT: ${{ needs.pr-quality.result }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${BRANCH_POLICY_RESULT}" != "success" || \
+                "${PR_QUALITY_RESULT}" != "success" ]]; then
+            echo "::error::Golden Path required pull-request checks failed."
+            echo "Branch policy: ${BRANCH_POLICY_RESULT}"
+            echo "PR quality: ${PR_QUALITY_RESULT}"
+            exit 1
+          fi
+
+          echo "Golden Path required pull-request checks passed."
